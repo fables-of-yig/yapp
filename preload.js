@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('yapp', {
   pickFile: () => ipcRenderer.invoke('pick-file'),
   saveFile: (opts) => ipcRenderer.invoke('save-file', opts),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  onLog: (callback) => ipcRenderer.on('log', (_e, msg) => callback(msg)),
 });

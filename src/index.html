@@ -560,6 +560,14 @@
   </div>
 
   <script>
+    // ── Client Logging ─────────────────────────────────────────────────
+    function clog(tag, ...args) {
+      console.log(`[client:${tag}]`, ...args);
+    }
+
+    // Forward main-process logs to devtools console
+    window.yapp.onLog((msg) => console.log('%c[main]', 'color: #888', msg));
+
     // ── State ───────────────────────────────────────────────────────────
     let ws = null;
     let myPeerId = null;
@@ -693,7 +701,11 @@
           result.port + ' (TCP) on your router for internet access.';
       }
 
-      if (!result.publicIp && !result.upnp) {
+      if (result.cgnat) {
+        warnEl.textContent = 'Your ISP uses Carrier-Grade NAT (CGNAT). ' +
+          'Your server will NOT be reachable from the internet. ' +
+          'You can still host for users on your local network, or ask someone without CGNAT to host.';
+      } else if (!result.publicIp && !result.upnp) {
         warnEl.textContent = 'Could not detect public IP or set up UPnP. ' +
           'The code uses your LAN IP — this will only work on your local network. ' +
           'For internet access, forward port ' + result.port + ' and share your public IP manually.';
@@ -754,13 +766,19 @@
 
     // ── WebSocket Connection ────────────────────────────────────────────
     function connectToServer(url, username, password, code) {
-      if (ws) ws.close();
+      clog('ws', `Connecting to ${url} as "${username}"...`);
+      if (ws) {
+        clog('ws', 'Closing existing WebSocket connection');
+        ws.close();
+      }
       currentServerCode = code;
       currentServerPassword = password;
 
       ws = new WebSocket(url);
 
       ws.onopen = () => {
+        clog('ws', `WebSocket connected to ${url}`);
+        clog('ws', 'Sending auth handshake...');
         ws.send(JSON.stringify({
           type: 'auth',
           username,
@@ -769,18 +787,30 @@
       };
 
       ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
+        let msg;
+        try {
+          msg = JSON.parse(e.data);
+        } catch (err) {
+          clog('ws', `Failed to parse server message: ${err.message}, raw=${String(e.data).slice(0, 100)}`);
+          return;
+        }
+        if (msg.type !== 'signal') {
+          clog('ws', `Received: ${msg.type}`, msg.type === 'auth-ok' ? `peerId=${msg.peerId}` : '');
+        }
         handleServerMessage(msg);
       };
 
-      ws.onerror = () => {
+      ws.onerror = (e) => {
+        clog('ws', `WebSocket error on ${url}:`, e.message || 'unknown error');
         addSystemMessage('Connection error. Is the server running and port forwarded?');
         document.getElementById('conn-dot').className = 'status-dot disconnected';
         document.getElementById('conn-status').textContent = 'Disconnected';
       };
 
       ws.onclose = (e) => {
+        clog('ws', `WebSocket closed: code=${e.code}, reason="${e.reason}", wasClean=${e.wasClean}`);
         if (e.code === 4001) {
+          clog('ws', 'Closed due to wrong password');
           document.getElementById('join-error').textContent = 'Wrong password.';
           showScreen('join');
           return;
@@ -948,7 +978,7 @@
     }
 
     // ── Voice Chat (WebRTC) ─────────────────────────────────────────────
-    // Multiple STUN servers for reliable NAT traversal over the internet
+    // STUN for discovery + TURN relay fallback for symmetric NAT / CGNAT
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -956,6 +986,10 @@
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
+        // TURN fallback for symmetric NAT / CGNAT / restrictive firewalls
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
       ],
       iceCandidatePoolSize: 10,
     };
@@ -965,6 +999,7 @@
       const muteBtn = document.getElementById('mute-toggle');
 
       if (voiceActive) {
+        clog('voice', 'Leaving voice chat');
         cleanupVoice();
         btn.textContent = 'Join Voice';
         btn.className = 'voice-btn';
@@ -972,6 +1007,7 @@
         return;
       }
 
+      clog('voice', 'Requesting microphone access...');
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -982,7 +1018,10 @@
             channelCount: 1,
           },
         });
+        const track = localStream.getAudioTracks()[0];
+        clog('voice', `Microphone acquired: ${track.label}, settings:`, JSON.stringify(track.getSettings()));
       } catch (err) {
+        clog('voice', `Microphone access failed: ${err.name}: ${err.message}`);
         addSystemMessage('Microphone access denied.');
         return;
       }
@@ -996,6 +1035,7 @@
       muteBtn.className = 'voice-btn';
       addSystemMessage('Joined voice chat');
 
+      clog('voice', `Initiating voice with ${peers.size} existing peers`);
       for (const [peerId] of peers) {
         initiateVoiceWith(peerId);
       }
@@ -1016,94 +1056,183 @@
     }
 
     async function initiateVoiceWith(peerId) {
-      if (peerConnections.has(peerId)) return;
+      if (peerConnections.has(peerId)) {
+        clog('rtc', `Already have connection to ${peerId}, skipping`);
+        return;
+      }
 
+      clog('rtc', `Creating offer for peer ${peerId}`);
       const pc = new RTCPeerConnection(rtcConfig);
       peerConnections.set(peerId, pc);
 
       localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
 
       pc.ontrack = (e) => {
+        clog('rtc', `Received remote track from ${peerId}: kind=${e.track.kind}, id=${e.track.id}`);
         const audio = new Audio();
         audio.srcObject = e.streams[0];
-        audio.play().catch(() => {});
+        audio.play().catch((err) => clog('rtc', `Audio autoplay blocked for ${peerId}: ${err.message}`));
         pc._remoteAudio = audio;
       };
 
       pc.onicecandidate = (e) => {
         if (e.candidate) {
-          ws.send(JSON.stringify({
-            type: 'signal',
-            to: peerId,
-            signal: { type: 'candidate', candidate: e.candidate },
-          }));
+          clog('rtc', `ICE candidate for ${peerId}: ${e.candidate.candidate.slice(0, 80)}`);
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({
+              type: 'signal',
+              to: peerId,
+              signal: { type: 'candidate', candidate: e.candidate },
+            }));
+          } else {
+            clog('rtc', `WARNING: Cannot send ICE candidate, WebSocket not open (state=${ws?.readyState})`);
+          }
+        } else {
+          clog('rtc', `ICE gathering complete for ${peerId}`);
         }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        clog('rtc', `ICE connection state for ${peerId}: ${pc.iceConnectionState}`);
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+        clog('rtc', `Connection state for ${peerId}: ${pc.connectionState}`);
+        if (pc.connectionState === 'failed') {
+          clog('rtc', `Connection FAILED for ${peerId} — may be behind symmetric NAT or CGNAT`);
           closePeerConnection(peerId);
+        } else if (pc.connectionState === 'disconnected') {
+          clog('rtc', `Connection disconnected for ${peerId}`);
+          closePeerConnection(peerId);
+        } else if (pc.connectionState === 'connected') {
+          clog('rtc', `Voice connected to ${peerId}!`);
         }
       };
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      ws.send(JSON.stringify({
-        type: 'signal',
-        to: peerId,
-        signal: { type: 'offer', sdp: pc.localDescription },
-      }));
+      pc.onicegatheringstatechange = () => {
+        clog('rtc', `ICE gathering state for ${peerId}: ${pc.iceGatheringState}`);
+      };
+
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        clog('rtc', `Offer created and set for ${peerId}`);
+        if (ws && ws.readyState === 1) {
+          ws.send(JSON.stringify({
+            type: 'signal',
+            to: peerId,
+            signal: { type: 'offer', sdp: pc.localDescription },
+          }));
+        } else {
+          clog('rtc', `WARNING: Cannot send offer, WebSocket not open`);
+        }
+      } catch (err) {
+        clog('rtc', `Failed to create offer for ${peerId}: ${err.message}`);
+      }
     }
 
     async function handleSignal(fromPeerId, signal) {
+      clog('rtc', `Received signal: ${signal.type} from ${fromPeerId}`);
+
       if (signal.type === 'offer') {
-        if (!voiceActive) return;
+        if (!voiceActive) {
+          clog('rtc', `Ignoring offer from ${fromPeerId} — voice not active`);
+          return;
+        }
+        clog('rtc', `Creating answer for ${fromPeerId}`);
         const pc = new RTCPeerConnection(rtcConfig);
         peerConnections.set(fromPeerId, pc);
 
         localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
 
         pc.ontrack = (e) => {
+          clog('rtc', `Received remote track from ${fromPeerId}: kind=${e.track.kind}`);
           const audio = new Audio();
           audio.srcObject = e.streams[0];
-          audio.play().catch(() => {});
+          audio.play().catch((err) => clog('rtc', `Audio autoplay blocked for ${fromPeerId}: ${err.message}`));
           pc._remoteAudio = audio;
         };
 
         pc.onicecandidate = (e) => {
           if (e.candidate) {
-            ws.send(JSON.stringify({
-              type: 'signal',
-              to: fromPeerId,
-              signal: { type: 'candidate', candidate: e.candidate },
-            }));
+            clog('rtc', `ICE candidate for ${fromPeerId}: ${e.candidate.candidate.slice(0, 80)}`);
+            if (ws && ws.readyState === 1) {
+              ws.send(JSON.stringify({
+                type: 'signal',
+                to: fromPeerId,
+                signal: { type: 'candidate', candidate: e.candidate },
+              }));
+            } else {
+              clog('rtc', `WARNING: Cannot send ICE candidate, WebSocket not open`);
+            }
           }
         };
 
-        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({
-          type: 'signal',
-          to: fromPeerId,
-          signal: { type: 'answer', sdp: pc.localDescription },
-        }));
+        pc.oniceconnectionstatechange = () => {
+          clog('rtc', `ICE connection state for ${fromPeerId}: ${pc.iceConnectionState}`);
+        };
+
+        pc.onconnectionstatechange = () => {
+          clog('rtc', `Connection state for ${fromPeerId}: ${pc.connectionState}`);
+          if (pc.connectionState === 'failed') {
+            clog('rtc', `Connection FAILED for ${fromPeerId} — may be behind symmetric NAT or CGNAT`);
+            closePeerConnection(fromPeerId);
+          } else if (pc.connectionState === 'disconnected') {
+            closePeerConnection(fromPeerId);
+          } else if (pc.connectionState === 'connected') {
+            clog('rtc', `Voice connected to ${fromPeerId}!`);
+          }
+        };
+
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          clog('rtc', `Answer created and set for ${fromPeerId}`);
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({
+              type: 'signal',
+              to: fromPeerId,
+              signal: { type: 'answer', sdp: pc.localDescription },
+            }));
+          }
+        } catch (err) {
+          clog('rtc', `Failed to handle offer from ${fromPeerId}: ${err.message}`);
+        }
       }
 
       if (signal.type === 'answer') {
         const pc = peerConnections.get(fromPeerId);
-        if (pc) await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        if (pc) {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+            clog('rtc', `Answer applied for ${fromPeerId}`);
+          } catch (err) {
+            clog('rtc', `Failed to apply answer from ${fromPeerId}: ${err.message}`);
+          }
+        } else {
+          clog('rtc', `WARNING: Got answer from ${fromPeerId} but no peer connection exists`);
+        }
       }
 
       if (signal.type === 'candidate') {
         const pc = peerConnections.get(fromPeerId);
-        if (pc) await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        if (pc) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } catch (err) {
+            clog('rtc', `Failed to add ICE candidate from ${fromPeerId}: ${err.message}`);
+          }
+        } else {
+          clog('rtc', `WARNING: Got ICE candidate from ${fromPeerId} but no peer connection exists`);
+        }
       }
     }
 
     function closePeerConnection(peerId) {
       const pc = peerConnections.get(peerId);
       if (pc) {
+        clog('rtc', `Closing peer connection to ${peerId}`);
         if (pc._remoteAudio) {
           pc._remoteAudio.pause();
           pc._remoteAudio.srcObject = null;
@@ -1114,6 +1243,7 @@
     }
 
     function cleanupVoice() {
+      clog('voice', `Cleaning up voice (${peerConnections.size} peer connections)`);
       voiceActive = false;
       muted = false;
       if (localStream) {
