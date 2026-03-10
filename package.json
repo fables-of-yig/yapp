@@ -1,6 +1,6 @@
 {
   "name": "yapp",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "Simple P2P voice, text, and file sharing",
   "main": "main.js",
   "scripts": {
