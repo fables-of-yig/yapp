@@ -1,0 +1,22 @@
+{
+  "name": "yakk",
+  "version": "1.0.0",
+  "description": "Simple P2P voice, text, and file sharing",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^40.8.0"
+  },
+  "dependencies": {
+    "nat-upnp": "^1.1.1",
+    "uuid": "^13.0.0",
+    "ws": "^8.19.0"
+  }
+}

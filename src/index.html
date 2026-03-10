@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yakk</title>
+  <style>
+    /* ── Theme Variables ─────────────────────────────── */
+    :root[data-theme="dark"] {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --surface2: #0f3460;
+      --accent: #e94560;
+      --accent-hover: #ff6b81;
+      --text: #eee;
+      --text-dim: #888;
+      --green: #2ecc71;
+      --red: #e74c3c;
+      --yellow: #f39c12;
+      --border: #2a2a4a;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --surface2: #e3e8ef;
+      --accent: #d63851;
+      --accent-hover: #e94560;
+      --text: #1a1a2e;
+      --text-dim: #666;
+      --green: #27ae60;
+      --red: #c0392b;
+      --yellow: #e67e22;
+      --border: #d0d5dd;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* ── Theme Toggle ────────────────────────────────── */
+    .theme-toggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 100;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .theme-toggle:hover { border-color: var(--accent); background: var(--surface2); }
+
+    /* ── Screens ─────────────────────────────────────── */
+    .screen { display: none; height: 100vh; }
+    .screen.active { display: flex; }
+
+    /* ── Home Screen ─────────────────────────────────── */
+    #home {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    #home h1 {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    #home p.tagline {
+      color: var(--text-dim);
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .home-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 300px;
+    }
+
+    button {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    button:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button:active { transform: scale(0.98); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover { background: var(--accent-hover); }
+    button.danger { background: var(--red); border-color: var(--red); color: #fff; }
+    button.small { padding: 6px 14px; font-size: 13px; }
+
+    /* ── Forms ────────────────────────────────────────── */
+    .form-screen {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .form-screen h2 { color: var(--accent); margin-bottom: 10px; }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 350px;
+    }
+
+    .form-group label { font-size: 13px; color: var(--text-dim); }
+
+    input, select {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    .code-display {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 14px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      letter-spacing: 2px;
+      text-align: center;
+      cursor: pointer;
+      word-break: break-all;
+      width: 350px;
+    }
+
+    .code-display:hover { border-color: var(--accent); }
+
+    .error-msg { color: var(--red); font-size: 13px; min-height: 18px; }
+    .success-msg { color: var(--green); font-size: 13px; min-height: 18px; }
+    .warn-msg { color: var(--yellow); font-size: 13px; min-height: 18px; }
+
+    /* ── Status badges ───────────────────────────────── */
+    .host-status {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 350px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .host-status .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .badge.ok { background: var(--green); color: #fff; }
+    .badge.warn { background: var(--yellow); color: #fff; }
+    .badge.fail { background: var(--red); color: #fff; }
+
+    /* ── Saved Servers ───────────────────────────────── */
+    .saved-list {
+      width: 400px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .saved-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .saved-item .info { flex: 1; cursor: pointer; }
+    .saved-item .info .name { font-weight: 600; }
+    .saved-item .info .code { font-size: 11px; color: var(--text-dim); font-family: monospace; }
+    .saved-item .actions { display: flex; gap: 6px; }
+
+    /* ── Chat Screen ─────────────────────────────────── */
+    #chat {
+      flex-direction: row;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 200px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .sidebar h3 {
+      font-size: 14px;
+      color: var(--accent);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .peer-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .peer-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .peer-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+    }
+
+    .voice-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .voice-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .voice-btn.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .voice-btn.muted { background: var(--red); border-color: var(--red); color: #fff; }
+
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chat-header h2 { font-size: 16px; }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-width: 80%;
+    }
+
+    .msg .meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 8px;
+    }
+
+    .msg .meta .author { color: var(--accent); font-weight: 600; }
+
+    .msg .body {
+      background: var(--surface);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .msg.system .body {
+      background: none;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-style: italic;
+      padding: 2px 0;
+    }
+
+    .msg.file .body {
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .msg.file .body:hover { border-color: var(--accent); }
+
+    .file-info { display: flex; align-items: center; gap: 8px; }
+    .file-icon { font-size: 20px; }
+    .file-details .file-name { font-weight: 600; font-size: 13px; }
+    .file-details .file-size { font-size: 11px; color: var(--text-dim); }
+
+    .chat-input {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .chat-input input { flex: 1; }
+
+    /* ── Scrollbar ────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+    /* ── Status indicator ────────────────────────────── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-dot.connected { background: var(--green); }
+    .status-dot.disconnected { background: var(--red); }
+
+    .back-link {
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 13px;
+      border: none;
+      background: none;
+      padding: 4px 0;
+    }
+    .back-link:hover { color: var(--text); background: none; }
+
+    /* ── Spinner ──────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode" id="theme-btn">&#9790;</button>
+
+  <!-- ══════════════ HOME SCREEN ══════════════ -->
+  <div id="home" class="screen active">
+    <h1>YAKK</h1>
+    <p class="tagline">simple voice &amp; text, your machine, your rules</p>
+    <div class="home-buttons">
+      <button class="primary" onclick="showScreen('host')">Host a Server</button>
+      <button onclick="showScreen('join')">Join a Server</button>
+      <button onclick="showScreen('saved')">Saved Servers</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ HOST SCREEN ══════════════ -->
+  <div id="host" class="screen form-screen">
+    <h2>Host a Server</h2>
+    <div class="form-group">
+      <label>Server Name</label>
+      <input id="host-name" type="text" placeholder="My Server" maxlength="32">
+    </div>
+    <div class="form-group">
+      <label>Password (optional)</label>
+      <input id="host-password" type="password" placeholder="Leave blank for none">
+    </div>
+    <div class="form-group">
+      <label>Port (0 = auto)</label>
+      <input id="host-port" type="number" value="0" min="0" max="65535">
+    </div>
+    <div class="error-msg" id="host-error"></div>
+    <button class="primary" id="host-start-btn" onclick="doHost()">Start Server</button>
+    <button class="back-link" onclick="showScreen('home')">&#8592; Back</button>
+  </div>
+
+  <!-- ══════════════ HOST ACTIVE SCREEN ══════════════ -->
+  <div id="host-active" class="screen form-screen">
+    <h2>Server Running</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:4px;">Share this code with your friends:</p>
+    <div class="code-display" id="host-code" onclick="copyCode()" title="Click to copy"></div>
+    <p class="success-msg" id="copy-msg"></p>
+
+    <div class="host-status" id="host-status-info">
+      <div class="row">
+        <span>Public IP</span>
+        <span id="status-public-ip">--</span>
+      </div>
+      <div class="row">
+        <span>Port</span>
+        <span id="status-port">--</span>
+      </div>
+      <div class="row">
+        <span>UPnP (auto port-forward)</span>
+        <span id="status-upnp">--</span>
+      </div>
+    </div>
+
+    <p class="warn-msg" id="host-warn" style="max-width:350px;text-align:center;"></p>
+
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="primary" onclick="joinOwnServer()">Enter Server</button>
+      <button class="danger" onclick="doStopServer()">Stop Server</button>
+    </div>
+    <button class="back-link" onclick="showScreen('home')">&#8592; Back (server stays running)</button>
+  </div>
+
+  <!-- ══════════════ JOIN SCREEN ══════════════ -->
+  <div id="join" class="screen form-screen">
+    <h2>Join a Server</h2>
+    <div class="form-group">
+      <label>Your Name</label>
+      <input id="join-username" type="text" placeholder="Anonymous" maxlength="24">
+    </div>
+    <div class="form-group">
+      <label>Server Code (30 characters)</label>
+      <input id="join-code" type="text" placeholder="Paste the 30-character code" maxlength="30" style="font-family:monospace;letter-spacing:1px;">
+    </div>
+    <div class="form-group">
+      <label>Password (if required)</label>
+      <input id="join-password" type="password" placeholder="Leave blank if none">
+    </div>
+    <div class="error-msg" id="join-error"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="primary" onclick="doJoin()">Connect</button>
+      <button onclick="doJoinAndSave()">Connect &amp; Save</button>
+    </div>
+    <button class="back-link" onclick="showScreen('home')">&#8592; Back</button>
+  </div>
+
+  <!-- ══════════════ SAVED SERVERS SCREEN ══════════════ -->
+  <div id="saved" class="screen form-screen">
+    <h2>Saved Servers</h2>
+    <div class="saved-list" id="saved-list"></div>
+    <p style="color:var(--text-dim);font-size:12px;margin-top:10px;" id="saved-empty">No saved servers yet.</p>
+    <button class="back-link" onclick="showScreen('home')">&#8592; Back</button>
+  </div>
+
+  <!-- ══════════════ CHAT SCREEN ══════════════ -->
+  <div id="chat" class="screen">
+    <div class="sidebar">
+      <h3 id="server-name-display">Server</h3>
+      <div class="peer-list" id="peer-list"></div>
+      <div class="voice-controls">
+        <button class="voice-btn" id="voice-toggle" onclick="toggleVoice()">
+          Join Voice
+        </button>
+        <button class="voice-btn" id="mute-toggle" onclick="toggleMute()" style="display:none;">
+          Mute
+        </button>
+      </div>
+      <button class="small danger" onclick="doDisconnect()">Disconnect</button>
+    </div>
+    <div class="main-area">
+      <div class="chat-header">
+        <h2 id="chat-server-name">Server</h2>
+        <div class="status-bar">
+          <div class="status-dot connected" id="conn-dot"></div>
+          <span id="conn-status">Connected</span>
+        </div>
+      </div>
+      <div class="messages" id="messages"></div>
+      <div class="chat-input">
+        <input id="msg-input" type="text" placeholder="Type a message..." maxlength="2000" autocomplete="off">
+        <button onclick="sendFile()" title="Share file">&#128206;</button>
+        <button class="primary" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ───────────────────────────────────────────────────────────
+    let ws = null;
+    let myPeerId = null;
+    let peers = new Map();
+    let voiceActive = false;
+    let muted = false;
+    let localStream = null;
+    let peerConnections = new Map();
+    let currentServerCode = null;
+    let currentServerPassword = '';
+    let hostInfo = null;
+
+    // ── Notification Sounds (Web Audio API) ─────────────────────────────
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playTone(freq, duration, type = 'sine', volume = 0.15) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function soundMessage() {
+      // Pleasant short ding
+      playTone(880, 0.12, 'sine', 0.12);
+      setTimeout(() => playTone(1100, 0.08, 'sine', 0.08), 60);
+    }
+
+    function soundJoin() {
+      // Ascending two-tone
+      playTone(440, 0.12, 'sine', 0.1);
+      setTimeout(() => playTone(660, 0.15, 'sine', 0.1), 100);
+    }
+
+    function soundLeave() {
+      // Descending two-tone
+      playTone(660, 0.12, 'sine', 0.1);
+      setTimeout(() => playTone(440, 0.15, 'sine', 0.1), 100);
+    }
+
+    function soundFile() {
+      // Three quick tones
+      playTone(523, 0.08, 'sine', 0.1);
+      setTimeout(() => playTone(659, 0.08, 'sine', 0.1), 80);
+      setTimeout(() => playTone(784, 0.12, 'sine', 0.1), 160);
+    }
+
+    // Also send OS-level notification when window isn't focused
+    function osNotify(title, body) {
+      if (document.hasFocus()) return;
+      new Notification(title, { body, silent: false });
+    }
+
+    // ── Theme Toggle ────────────────────────────────────────────────────
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('yakk-theme', next);
+      document.getElementById('theme-btn').innerHTML = next === 'dark' ? '&#9790;' : '&#9788;';
+    }
+
+    // Load saved theme
+    (function() {
+      const saved = localStorage.getItem('yakk-theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+        document.getElementById('theme-btn').innerHTML = saved === 'dark' ? '&#9790;' : '&#9788;';
+      }
+    })();
+
+    // ── Screen Management ───────────────────────────────────────────────
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      if (id === 'saved') loadSavedServers();
+    }
+
+    // ── Host ────────────────────────────────────────────────────────────
+    async function doHost() {
+      const name = document.getElementById('host-name').value.trim() || 'My Server';
+      const password = document.getElementById('host-password').value;
+      const port = parseInt(document.getElementById('host-port').value) || 0;
+      const errEl = document.getElementById('host-error');
+      const btn = document.getElementById('host-start-btn');
+      errEl.textContent = '';
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Starting...';
+
+      const result = await window.yakk.hostServer({ name, password, port });
+
+      btn.disabled = false;
+      btn.textContent = 'Start Server';
+
+      if (!result.ok) {
+        errEl.textContent = result.error;
+        return;
+      }
+
+      hostInfo = result;
+      document.getElementById('host-code').textContent = result.code;
+
+      // Status display
+      const pubEl = document.getElementById('status-public-ip');
+      const portEl = document.getElementById('status-port');
+      const upnpEl = document.getElementById('status-upnp');
+      const warnEl = document.getElementById('host-warn');
+      warnEl.textContent = '';
+
+      portEl.textContent = result.port;
+
+      if (result.publicIp) {
+        pubEl.innerHTML = result.publicIp + ' <span class="badge ok">OK</span>';
+      } else {
+        pubEl.innerHTML = result.localIp + ' <span class="badge warn">LAN only</span>';
+      }
+
+      if (result.upnp) {
+        upnpEl.innerHTML = '<span class="badge ok">Mapped</span>';
+      } else {
+        upnpEl.innerHTML = '<span class="badge warn">Failed</span>';
+        warnEl.textContent = 'UPnP failed. You may need to manually forward port ' +
+          result.port + ' (TCP) on your router for internet access.';
+      }
+
+      if (!result.publicIp && !result.upnp) {
+        warnEl.textContent = 'Could not detect public IP or set up UPnP. ' +
+          'The code uses your LAN IP — this will only work on your local network. ' +
+          'For internet access, forward port ' + result.port + ' and share your public IP manually.';
+      }
+
+      showScreen('host-active');
+    }
+
+    function copyCode() {
+      const code = document.getElementById('host-code').textContent;
+      navigator.clipboard.writeText(code);
+      const msg = document.getElementById('copy-msg');
+      msg.textContent = 'Copied to clipboard!';
+      setTimeout(() => msg.textContent = '', 2000);
+    }
+
+    async function doStopServer() {
+      await window.yakk.stopServer();
+      hostInfo = null;
+      showScreen('home');
+    }
+
+    function joinOwnServer() {
+      if (!hostInfo) return;
+      const username = document.getElementById('host-name').value.trim() || 'Host';
+      const password = document.getElementById('host-password').value;
+      connectToServer('ws://127.0.0.1:' + hostInfo.port, username, password, hostInfo.code);
+    }
+
+    // ── Join ────────────────────────────────────────────────────────────
+    async function doJoin(save) {
+      const username = document.getElementById('join-username').value.trim() || 'Anonymous';
+      const code = document.getElementById('join-code').value.trim();
+      const password = document.getElementById('join-password').value;
+      const errEl = document.getElementById('join-error');
+      errEl.textContent = '';
+
+      if (code.length !== 30) {
+        errEl.textContent = 'Code must be exactly 30 characters.';
+        return;
+      }
+
+      const decoded = await window.yakk.decodeCode(code);
+      if (!decoded.ok) {
+        errEl.textContent = decoded.error;
+        return;
+      }
+
+      if (save) {
+        await window.yakk.saveServer({ code, name: 'Server', password });
+      }
+
+      const url = `ws://${decoded.ip}:${decoded.port}`;
+      connectToServer(url, username, password, code);
+    }
+
+    function doJoinAndSave() { doJoin(true); }
+
+    // ── WebSocket Connection ────────────────────────────────────────────
+    function connectToServer(url, username, password, code) {
+      if (ws) ws.close();
+      currentServerCode = code;
+      currentServerPassword = password;
+
+      ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          type: 'auth',
+          username,
+          password,
+        }));
+      };
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        handleServerMessage(msg);
+      };
+
+      ws.onerror = () => {
+        addSystemMessage('Connection error. Is the server running and port forwarded?');
+        document.getElementById('conn-dot').className = 'status-dot disconnected';
+        document.getElementById('conn-status').textContent = 'Disconnected';
+      };
+
+      ws.onclose = (e) => {
+        if (e.code === 4001) {
+          document.getElementById('join-error').textContent = 'Wrong password.';
+          showScreen('join');
+          return;
+        }
+        addSystemMessage('Disconnected from server.');
+        document.getElementById('conn-dot').className = 'status-dot disconnected';
+        document.getElementById('conn-status').textContent = 'Disconnected';
+        cleanupVoice();
+      };
+    }
+
+    function handleServerMessage(msg) {
+      switch (msg.type) {
+        case 'auth-ok':
+          myPeerId = msg.peerId;
+          peers.clear();
+          for (const p of msg.peers) peers.set(p.peerId, p.username);
+          document.getElementById('server-name-display').textContent = msg.serverName;
+          document.getElementById('chat-server-name').textContent = msg.serverName;
+          document.getElementById('messages').innerHTML = '';
+          updatePeerList();
+          showScreen('chat');
+          addSystemMessage(`Connected! ${peers.size > 0 ? `(${peers.size} other${peers.size > 1 ? 's' : ''} online)` : "(you're first!)"}`);
+          break;
+
+        case 'auth-fail':
+          addSystemMessage('Auth failed: ' + msg.reason);
+          break;
+
+        case 'peer-join':
+          peers.set(msg.peerId, msg.username);
+          updatePeerList();
+          addSystemMessage(`${msg.username} joined`);
+          soundJoin();
+          osNotify('Yakk', `${msg.username} joined the server`);
+          if (voiceActive) initiateVoiceWith(msg.peerId);
+          break;
+
+        case 'peer-leave': {
+          const leftName = peers.get(msg.peerId) || 'Someone';
+          peers.delete(msg.peerId);
+          updatePeerList();
+          addSystemMessage(`${leftName} left`);
+          soundLeave();
+          closePeerConnection(msg.peerId);
+          break;
+        }
+
+        case 'chat':
+          addChatMessage(msg.username, msg.text, msg.ts);
+          if (msg.from !== myPeerId) {
+            soundMessage();
+            osNotify(`Yakk - ${msg.username}`, msg.text);
+          }
+          break;
+
+        case 'file':
+          addFileMessage(msg.username, msg.name, msg.size, msg.data, msg.ts);
+          if (msg.from !== myPeerId) {
+            soundFile();
+            osNotify(`Yakk - ${msg.username}`, `Shared file: ${msg.name}`);
+          }
+          break;
+
+        case 'signal':
+          handleSignal(msg.from, msg.signal);
+          break;
+      }
+    }
+
+    // ── Peer List ───────────────────────────────────────────────────────
+    function updatePeerList() {
+      const el = document.getElementById('peer-list');
+      el.innerHTML = '';
+      for (const [id, name] of peers) {
+        const div = document.createElement('div');
+        div.className = 'peer-item';
+        div.innerHTML = `<div class="peer-dot"></div><span>${esc(name)}</span>`;
+        el.appendChild(div);
+      }
+    }
+
+    // ── Chat Messages ───────────────────────────────────────────────────
+    function addSystemMessage(text) {
+      const el = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = 'msg system';
+      div.innerHTML = `<div class="body">${esc(text)}</div>`;
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function addChatMessage(author, text, ts) {
+      const el = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = 'msg';
+      div.innerHTML = `
+        <div class="meta">
+          <span class="author">${esc(author)}</span>
+          <span>${new Date(ts).toLocaleTimeString()}</span>
+        </div>
+        <div class="body">${esc(text)}</div>`;
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function addFileMessage(author, name, size, data, ts) {
+      const el = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = 'msg file';
+      const sizeStr = size < 1024 ? size + ' B'
+        : size < 1048576 ? (size / 1024).toFixed(1) + ' KB'
+        : (size / 1048576).toFixed(1) + ' MB';
+      div.innerHTML = `
+        <div class="meta">
+          <span class="author">${esc(author)}</span>
+          <span>${new Date(ts).toLocaleTimeString()}</span>
+        </div>
+        <div class="body">
+          <div class="file-info">
+            <span class="file-icon">&#128196;</span>
+            <div class="file-details">
+              <div class="file-name">${esc(name)}</div>
+              <div class="file-size">${sizeStr} &#8212; click to save</div>
+            </div>
+          </div>
+        </div>`;
+      div.querySelector('.body').onclick = () => {
+        window.yakk.saveFile({ name, data });
+      };
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('msg-input');
+      const text = input.value.trim();
+      if (!text || !ws) return;
+      ws.send(JSON.stringify({ type: 'chat', text }));
+      input.value = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && document.activeElement === document.getElementById('msg-input')) {
+        sendMessage();
+      }
+    });
+
+    async function sendFile() {
+      const file = await window.yakk.pickFile();
+      if (!file) return;
+      if (file.error) {
+        addSystemMessage(file.error);
+        return;
+      }
+      ws.send(JSON.stringify({ type: 'file', name: file.name, size: file.size, data: file.data }));
+    }
+
+    // ── Disconnect ──────────────────────────────────────────────────────
+    function doDisconnect() {
+      cleanupVoice();
+      if (ws) { ws.close(); ws = null; }
+      peers.clear();
+      showScreen('home');
+    }
+
+    // ── Voice Chat (WebRTC) ─────────────────────────────────────────────
+    // Multiple STUN servers for reliable NAT traversal over the internet
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+      ],
+      iceCandidatePoolSize: 10,
+    };
+
+    async function toggleVoice() {
+      const btn = document.getElementById('voice-toggle');
+      const muteBtn = document.getElementById('mute-toggle');
+
+      if (voiceActive) {
+        cleanupVoice();
+        btn.textContent = 'Join Voice';
+        btn.className = 'voice-btn';
+        muteBtn.style.display = 'none';
+        return;
+      }
+
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1,
+          },
+        });
+      } catch (err) {
+        addSystemMessage('Microphone access denied.');
+        return;
+      }
+
+      voiceActive = true;
+      muted = false;
+      btn.textContent = 'Leave Voice';
+      btn.className = 'voice-btn active';
+      muteBtn.style.display = '';
+      muteBtn.textContent = 'Mute';
+      muteBtn.className = 'voice-btn';
+      addSystemMessage('Joined voice chat');
+
+      for (const [peerId] of peers) {
+        initiateVoiceWith(peerId);
+      }
+    }
+
+    function toggleMute() {
+      if (!localStream) return;
+      muted = !muted;
+      localStream.getAudioTracks().forEach((t) => t.enabled = !muted);
+      const btn = document.getElementById('mute-toggle');
+      if (muted) {
+        btn.textContent = 'Unmute';
+        btn.className = 'voice-btn muted';
+      } else {
+        btn.textContent = 'Mute';
+        btn.className = 'voice-btn';
+      }
+    }
+
+    async function initiateVoiceWith(peerId) {
+      if (peerConnections.has(peerId)) return;
+
+      const pc = new RTCPeerConnection(rtcConfig);
+      peerConnections.set(peerId, pc);
+
+      localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+
+      pc.ontrack = (e) => {
+        const audio = new Audio();
+        audio.srcObject = e.streams[0];
+        audio.play().catch(() => {});
+        pc._remoteAudio = audio;
+      };
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          ws.send(JSON.stringify({
+            type: 'signal',
+            to: peerId,
+            signal: { type: 'candidate', candidate: e.candidate },
+          }));
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          closePeerConnection(peerId);
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({
+        type: 'signal',
+        to: peerId,
+        signal: { type: 'offer', sdp: pc.localDescription },
+      }));
+    }
+
+    async function handleSignal(fromPeerId, signal) {
+      if (signal.type === 'offer') {
+        if (!voiceActive) return;
+        const pc = new RTCPeerConnection(rtcConfig);
+        peerConnections.set(fromPeerId, pc);
+
+        localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+
+        pc.ontrack = (e) => {
+          const audio = new Audio();
+          audio.srcObject = e.streams[0];
+          audio.play().catch(() => {});
+          pc._remoteAudio = audio;
+        };
+
+        pc.onicecandidate = (e) => {
+          if (e.candidate) {
+            ws.send(JSON.stringify({
+              type: 'signal',
+              to: fromPeerId,
+              signal: { type: 'candidate', candidate: e.candidate },
+            }));
+          }
+        };
+
+        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        ws.send(JSON.stringify({
+          type: 'signal',
+          to: fromPeerId,
+          signal: { type: 'answer', sdp: pc.localDescription },
+        }));
+      }
+
+      if (signal.type === 'answer') {
+        const pc = peerConnections.get(fromPeerId);
+        if (pc) await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      }
+
+      if (signal.type === 'candidate') {
+        const pc = peerConnections.get(fromPeerId);
+        if (pc) await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      }
+    }
+
+    function closePeerConnection(peerId) {
+      const pc = peerConnections.get(peerId);
+      if (pc) {
+        if (pc._remoteAudio) {
+          pc._remoteAudio.pause();
+          pc._remoteAudio.srcObject = null;
+        }
+        pc.close();
+        peerConnections.delete(peerId);
+      }
+    }
+
+    function cleanupVoice() {
+      voiceActive = false;
+      muted = false;
+      if (localStream) {
+        localStream.getTracks().forEach((t) => t.stop());
+        localStream = null;
+      }
+      for (const [id] of peerConnections) closePeerConnection(id);
+      peerConnections.clear();
+    }
+
+    // ── Saved Servers ───────────────────────────────────────────────────
+    async function loadSavedServers() {
+      const list = await window.yakk.getSavedServers();
+      const el = document.getElementById('saved-list');
+      const emptyEl = document.getElementById('saved-empty');
+      el.innerHTML = '';
+
+      if (list.length === 0) {
+        emptyEl.style.display = '';
+        return;
+      }
+      emptyEl.style.display = 'none';
+
+      for (const s of list) {
+        const div = document.createElement('div');
+        div.className = 'saved-item';
+        div.innerHTML = `
+          <div class="info">
+            <div class="name">${esc(s.name)}</div>
+            <div class="code">${esc(s.code)}</div>
+          </div>
+          <div class="actions">
+            <button class="small primary" data-action="connect">Connect</button>
+            <button class="small danger" data-action="remove">&#10005;</button>
+          </div>`;
+
+        div.querySelector('[data-action="connect"]').onclick = async () => {
+          const decoded = await window.yakk.decodeCode(s.code);
+          if (!decoded.ok) { alert(decoded.error); return; }
+          const url = `ws://${decoded.ip}:${decoded.port}`;
+          const username = prompt('Your name:', 'Anonymous') || 'Anonymous';
+          connectToServer(url, username, s.password || '', s.code);
+        };
+
+        div.querySelector('[data-action="remove"]').onclick = async () => {
+          await window.yakk.removeServer(s.code);
+          loadSavedServers();
+        };
+
+        el.appendChild(div);
+      }
+    }
+
+    // ── Utility ─────────────────────────────────────────────────────────
+    function esc(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
