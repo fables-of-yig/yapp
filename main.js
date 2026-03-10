@@ -194,43 +194,22 @@ ipcMain.handle('save-file', async (_e, { name, data }) => {
 // ── Check for updates ────────────────────────────────────────────────
 function checkForUpdates() {
   return new Promise((resolve) => {
-    const options = {
-      hostname: 'api.github.com',
-      path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-      headers: {
-        'User-Agent': 'Yapp-Updater',
-        'Accept': 'application/vnd.github.v3+json',
-      },
-      timeout: 10000,
-    };
-
-    const req = https.get(options, (res) => {
+    const url = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/package.json`;
+    const req = https.get(url, { headers: { 'User-Agent': 'Yapp-Updater' }, timeout: 10000 }, (res) => {
       let data = '';
       res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
-        if (res.statusCode === 404) {
-          resolve({ ok: true, upToDate: true, current: CURRENT_VERSION, note: 'No releases published yet' });
-          return;
-        }
         if (res.statusCode !== 200) {
-          resolve({ ok: false, error: `GitHub API returned ${res.statusCode}` });
+          resolve({ ok: false, error: `GitHub returned ${res.statusCode}` });
           return;
         }
         try {
-          const release = JSON.parse(data);
-          const latest = release.tag_name.replace(/^v/, '');
+          const remote = JSON.parse(data);
+          const latest = remote.version;
           const upToDate = latest === CURRENT_VERSION;
-          resolve({
-            ok: true,
-            upToDate,
-            current: CURRENT_VERSION,
-            latest,
-            name: release.name,
-            url: release.html_url,
-            body: release.body,
-          });
+          resolve({ ok: true, upToDate, current: CURRENT_VERSION, latest });
         } catch (err) {
-          resolve({ ok: false, error: 'Failed to parse response' });
+          resolve({ ok: false, error: 'Failed to parse remote package.json' });
         }
       });
     });
