@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('yakk', {
+contextBridge.exposeInMainWorld('yapp', {
   hostServer: (opts) => ipcRenderer.invoke('host-server', opts),
   stopServer: () => ipcRenderer.invoke('stop-server'),
   getServerStatus: () => ipcRenderer.invoke('get-server-status'),
@@ -10,5 +10,5 @@ contextBridge.exposeInMainWorld('yakk', {
   removeServer: (code) => ipcRenderer.invoke('remove-server', code),
   pickFile: () => ipcRenderer.invoke('pick-file'),
   saveFile: (opts) => ipcRenderer.invoke('save-file', opts),
-  getLocalIp: () => ipcRenderer.invoke('get-local-ip'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 });

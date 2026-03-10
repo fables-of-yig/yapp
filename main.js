@@ -8,6 +8,11 @@ const Store = require('./src/store');
 const os = require('os');
 const natUpnp = require('nat-upnp');
 
+// ── GitHub update config ──────────────────────────────────────────────
+const GITHUB_OWNER = 'fables-of-yig';
+const GITHUB_REPO = 'yapp';
+const CURRENT_VERSION = require('./package.json').version;
+
 let mainWindow;
 let server = null;
 let upnpClient = null;
@@ -20,7 +25,7 @@ function createWindow() {
     height: 650,
     minWidth: 700,
     minHeight: 500,
-    title: 'Yakk',
+    title: 'Yapp',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -63,7 +68,7 @@ function mapPort(port) {
       public: port,
       private: port,
       ttl: 0,
-      description: 'Yakk Server',
+      description: 'Yapp Server',
     }, (err) => {
       if (err) {
         resolve(false);
@@ -184,4 +189,56 @@ ipcMain.handle('save-file', async (_e, { name, data }) => {
   const fs = require('fs');
   fs.writeFileSync(result.filePath, Buffer.from(data, 'base64'));
   return { ok: true };
+});
+
+// ── Check for updates ────────────────────────────────────────────────
+function checkForUpdates() {
+  return new Promise((resolve) => {
+    const options = {
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+      headers: {
+        'User-Agent': 'Yapp-Updater',
+        'Accept': 'application/vnd.github.v3+json',
+      },
+      timeout: 10000,
+    };
+
+    const req = https.get(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 404) {
+          resolve({ ok: true, upToDate: true, current: CURRENT_VERSION, note: 'No releases published yet' });
+          return;
+        }
+        if (res.statusCode !== 200) {
+          resolve({ ok: false, error: `GitHub API returned ${res.statusCode}` });
+          return;
+        }
+        try {
+          const release = JSON.parse(data);
+          const latest = release.tag_name.replace(/^v/, '');
+          const upToDate = latest === CURRENT_VERSION;
+          resolve({
+            ok: true,
+            upToDate,
+            current: CURRENT_VERSION,
+            latest,
+            name: release.name,
+            url: release.html_url,
+            body: release.body,
+          });
+        } catch (err) {
+          resolve({ ok: false, error: 'Failed to parse response' });
+        }
+      });
+    });
+    req.on('error', (err) => resolve({ ok: false, error: err.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Request timed out' }); });
+  });
+}
+
+ipcMain.handle('check-for-updates', async () => {
+  return checkForUpdates();
 });

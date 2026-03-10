@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yakk</title>
+  <title>Yapp</title>
   <style>
     /* ── Theme Variables ─────────────────────────────── */
     :root[data-theme="dark"] {
@@ -169,6 +169,14 @@
     .error-msg { color: var(--red); font-size: 13px; min-height: 18px; }
     .success-msg { color: var(--green); font-size: 13px; min-height: 18px; }
     .warn-msg { color: var(--yellow); font-size: 13px; min-height: 18px; }
+
+    .update-msg {
+      font-size: 13px;
+      min-height: 18px;
+      text-align: center;
+      max-width: 350px;
+    }
+    .update-msg a { color: var(--accent); cursor: pointer; text-decoration: underline; }
 
     /* ── Status badges ───────────────────────────────── */
     .host-status {
@@ -426,13 +434,15 @@
 
   <!-- ══════════════ HOME SCREEN ══════════════ -->
   <div id="home" class="screen active">
-    <h1>YAKK</h1>
+    <h1>YAPP</h1>
     <p class="tagline">simple voice &amp; text, your machine, your rules</p>
     <div class="home-buttons">
       <button class="primary" onclick="showScreen('host')">Host a Server</button>
       <button onclick="showScreen('join')">Join a Server</button>
       <button onclick="showScreen('saved')">Saved Servers</button>
+      <button id="update-btn" onclick="doCheckForUpdates()">Check for Updates</button>
     </div>
+    <p class="update-msg" id="update-msg"></p>
   </div>
 
   <!-- ══════════════ HOST SCREEN ══════════════ -->
@@ -615,13 +625,13 @@
       const current = html.getAttribute('data-theme');
       const next = current === 'dark' ? 'light' : 'dark';
       html.setAttribute('data-theme', next);
-      localStorage.setItem('yakk-theme', next);
+      localStorage.setItem('yapp-theme', next);
       document.getElementById('theme-btn').innerHTML = next === 'dark' ? '&#9790;' : '&#9788;';
     }
 
     // Load saved theme
     (function() {
-      const saved = localStorage.getItem('yakk-theme');
+      const saved = localStorage.getItem('yapp-theme');
       if (saved) {
         document.documentElement.setAttribute('data-theme', saved);
         document.getElementById('theme-btn').innerHTML = saved === 'dark' ? '&#9790;' : '&#9788;';
@@ -647,7 +657,7 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Starting...';
 
-      const result = await window.yakk.hostServer({ name, password, port });
+      const result = await window.yapp.hostServer({ name, password, port });
 
       btn.disabled = false;
       btn.textContent = 'Start Server';
@@ -701,7 +711,7 @@
     }
 
     async function doStopServer() {
-      await window.yakk.stopServer();
+      await window.yapp.stopServer();
       hostInfo = null;
       showScreen('home');
     }
@@ -726,14 +736,14 @@
         return;
       }
 
-      const decoded = await window.yakk.decodeCode(code);
+      const decoded = await window.yapp.decodeCode(code);
       if (!decoded.ok) {
         errEl.textContent = decoded.error;
         return;
       }
 
       if (save) {
-        await window.yakk.saveServer({ code, name: 'Server', password });
+        await window.yapp.saveServer({ code, name: 'Server', password });
       }
 
       const url = `ws://${decoded.ip}:${decoded.port}`;
@@ -805,7 +815,7 @@
           updatePeerList();
           addSystemMessage(`${msg.username} joined`);
           soundJoin();
-          osNotify('Yakk', `${msg.username} joined the server`);
+          osNotify('Yapp', `${msg.username} joined the server`);
           if (voiceActive) initiateVoiceWith(msg.peerId);
           break;
 
@@ -823,7 +833,7 @@
           addChatMessage(msg.username, msg.text, msg.ts);
           if (msg.from !== myPeerId) {
             soundMessage();
-            osNotify(`Yakk - ${msg.username}`, msg.text);
+            osNotify(`Yapp - ${msg.username}`, msg.text);
           }
           break;
 
@@ -831,7 +841,7 @@
           addFileMessage(msg.username, msg.name, msg.size, msg.data, msg.ts);
           if (msg.from !== myPeerId) {
             soundFile();
-            osNotify(`Yakk - ${msg.username}`, `Shared file: ${msg.name}`);
+            osNotify(`Yapp - ${msg.username}`, `Shared file: ${msg.name}`);
           }
           break;
 
@@ -899,7 +909,7 @@
           </div>
         </div>`;
       div.querySelector('.body').onclick = () => {
-        window.yakk.saveFile({ name, data });
+        window.yapp.saveFile({ name, data });
       };
       el.appendChild(div);
       el.scrollTop = el.scrollHeight;
@@ -920,7 +930,7 @@
     });
 
     async function sendFile() {
-      const file = await window.yakk.pickFile();
+      const file = await window.yapp.pickFile();
       if (!file) return;
       if (file.error) {
         addSystemMessage(file.error);
@@ -1116,7 +1126,7 @@
 
     // ── Saved Servers ───────────────────────────────────────────────────
     async function loadSavedServers() {
-      const list = await window.yakk.getSavedServers();
+      const list = await window.yapp.getSavedServers();
       const el = document.getElementById('saved-list');
       const emptyEl = document.getElementById('saved-empty');
       el.innerHTML = '';
@@ -1141,7 +1151,7 @@
           </div>`;
 
         div.querySelector('[data-action="connect"]').onclick = async () => {
-          const decoded = await window.yakk.decodeCode(s.code);
+          const decoded = await window.yapp.decodeCode(s.code);
           if (!decoded.ok) { alert(decoded.error); return; }
           const url = `ws://${decoded.ip}:${decoded.port}`;
           const username = prompt('Your name:', 'Anonymous') || 'Anonymous';
@@ -1149,11 +1159,44 @@
         };
 
         div.querySelector('[data-action="remove"]').onclick = async () => {
-          await window.yakk.removeServer(s.code);
+          await window.yapp.removeServer(s.code);
           loadSavedServers();
         };
 
         el.appendChild(div);
+      }
+    }
+
+    // ── Update Check ─────────────────────────────────────────────────────
+    async function doCheckForUpdates() {
+      const btn = document.getElementById('update-btn');
+      const msgEl = document.getElementById('update-msg');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Checking...';
+      msgEl.textContent = '';
+
+      const result = await window.yapp.checkForUpdates();
+      btn.disabled = false;
+      btn.textContent = 'Check for Updates';
+
+      if (!result.ok) {
+        msgEl.style.color = 'var(--red)';
+        msgEl.textContent = result.error;
+        return;
+      }
+
+      if (result.note) {
+        msgEl.style.color = 'var(--text-dim)';
+        msgEl.textContent = `v${result.current} — ${result.note}`;
+        return;
+      }
+
+      if (result.upToDate) {
+        msgEl.style.color = 'var(--green)';
+        msgEl.textContent = `v${result.current} — You're up to date!`;
+      } else {
+        msgEl.style.color = 'var(--yellow)';
+        msgEl.innerHTML = `Update available: v${result.current} → v${esc(result.latest)}`;
       }
     }
 
